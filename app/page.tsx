@@ -1,87 +1,216 @@
-'use client'; // This tells Next.js this component runs in the browser (client-side)
+'use client';
 
-// Import useState from React - this is the hook we use to manage state (data that can change)
-import { useState } from 'react';
-// Import Link from Next.js for navigation between pages
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth-context';
+import { updateUserClickCount, getUserClickCount } from '@/lib/firestore-utils';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Loader2, LogOut } from 'lucide-react';
 
-// This is our main component that will display on the page
 export default function ClickCounterApp() {
-  // useState is a React hook that lets us create state variables
-  // const [variable, functionToUpdateVariable] = useState(initialValue)
-  // clickCount = the current value (starts at 0)
-  // setClickCount = the function we call to update clickCount
+  const { user, loading, logout } = useAuth();
+  const router = useRouter();
   const [clickCount, setClickCount] = useState(0);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // This function runs when the user clicks the button
-  // It increases the click count by 1
-  const handleButtonClick = () => {
-    // setClickCount updates the state with a new value
-    // clickCount + 1 means: take the current value and add 1 to it
-    setClickCount(clickCount + 1);
+  // Load click count from Firestore when user logs in
+  useEffect(() => {
+    if (!loading && user) {
+      loadClickCount();
+    }
+  }, [user, loading]);
+
+  const loadClickCount = async () => {
+    if (!user) return;
+    try {
+      setDbLoading(true);
+      const count = await getUserClickCount(user);
+      setClickCount(count);
+    } catch (error) {
+      console.error('Failed to load click count:', error);
+    } finally {
+      setDbLoading(false);
+    }
   };
 
-  // This function resets the counter back to 0
-  // Great for starting over!
-  const handleReset = () => {
+  const handleButtonClick = async () => {
+    if (!user) return;
+    
+    const newCount = clickCount + 1;
+    setClickCount(newCount);
+
+    // Save to Firestore
+    try {
+      setIsSaving(true);
+      await updateUserClickCount(user, newCount);
+    } catch (error) {
+      console.error('Failed to save click count:', error);
+      // Revert on error
+      setClickCount(clickCount);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!user) return;
+    
     setClickCount(0);
+
+    // Save reset to Firestore
+    try {
+      setIsSaving(true);
+      await updateUserClickCount(user, 0);
+    } catch (error) {
+      console.error('Failed to save reset:', error);
+      // Revert on error
+      setClickCount(clickCount);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // JSX (JavaScript XML) - this is what React displays on the page
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8 text-center">
+          <h1 className="text-3xl font-bold text-indigo-600 mb-4">Welcome</h1>
+          <p className="text-gray-600 mb-6">
+            You need to be logged in to use the click counter. Please log in or create an account.
+          </p>
+          <div className="flex gap-4">
+            <Button
+              onClick={() => router.push('/login')}
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+            >
+              Login
+            </Button>
+            <Button
+              onClick={() => router.push('/signup')}
+              variant="outline"
+              className="flex-1"
+            >
+              Sign Up
+            </Button>
+          </div>
+        </Card>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      {/* Navigation link to the React & Next.js manual */}
-      <Link
-        href="/manual"
-        className="absolute top-4 right-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-      >
-        Read Manual
-      </Link>
+      {/* Navigation */}
+      <div className="absolute top-4 left-4 right-4 flex justify-between items-center gap-4">
+        <Link
+          href="/manual"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+        >
+          Read Manual
+        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/settings"
+            className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+          >
+            Settings
+          </Link>
+          <Button
+            onClick={handleLogout}
+            variant="ghost"
+            className="flex items-center gap-2 text-sm"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout
+          </Button>
+        </div>
+      </div>
 
-      {/* Container div that holds everything centered on the page */}
-      <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 max-w-md w-full">
-        
-        {/* Title - tells the user what this app does */}
-        <h1 className="text-4xl font-bold text-center text-indigo-600 mb-2">
-          Click Counter
-        </h1>
-        
-        {/* Subtitle - friendly explanation */}
-        <p className="text-center text-gray-600 text-sm mb-8">
-          Click the button below to count how many times you click!
-        </p>
-
-        {/* Display the current click count */}
-        {/* The curly braces {} let us insert JavaScript values into JSX */}
-        <div className="bg-indigo-50 rounded-lg p-8 mb-6 text-center">
-          <p className="text-gray-600 text-sm font-medium mb-2">Current Count:</p>
-          <p className="text-6xl font-bold text-indigo-600">
-            {clickCount}
+      {/* Main Card */}
+      <Card className="w-full max-w-md p-8 md:p-12 mt-20">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-center text-indigo-600 mb-2">
+            Click Counter
+          </h1>
+          <p className="text-center text-gray-600 text-sm mb-2">
+            Click the button to count!
+          </p>
+          <p className="text-center text-xs text-gray-500">
+            Logged in as: {user.email}
           </p>
         </div>
 
-        {/* The main button that users click */}
-        <button
-          // onClick is an event handler - it runs our function when clicked
+        {/* Display current count */}
+        <div className="bg-indigo-50 rounded-lg p-8 mb-6 text-center">
+          <p className="text-gray-600 text-sm font-medium mb-2">Current Count:</p>
+          {dbLoading ? (
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+          ) : (
+            <p className="text-6xl font-bold text-indigo-600">{clickCount}</p>
+          )}
+        </div>
+
+        {/* Click button */}
+        <Button
           onClick={handleButtonClick}
-          // className applies Tailwind CSS styling to make it look nice
-          className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 mb-4 text-lg"
+          disabled={isSaving || dbLoading}
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-16 text-lg font-bold mb-4"
         >
-          Click Me! 🎯
-        </button>
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Click Me! 🎯'
+          )}
+        </Button>
 
-        {/* Reset button - lets user start counting from 0 again */}
-        <button
+        {/* Reset button */}
+        <Button
           onClick={handleReset}
-          className="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg transition-all duration-200 text-base"
+          disabled={isSaving || dbLoading}
+          variant="outline"
+          className="w-full h-12"
         >
-          Reset Counter ↻
-        </button>
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Reset Counter ↻'
+          )}
+        </Button>
 
-        {/* Fun fact section - shows some info based on the click count */}
+        {/* Motivational message */}
         <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <p className="text-sm text-gray-700">
-            {/* This is a conditional - different messages based on how many clicks */}
             {clickCount === 0 && '👋 Click the button to start counting!'}
             {clickCount > 0 && clickCount < 5 && '🚀 You\'re getting started!'}
             {clickCount >= 5 && clickCount < 10 && '⭐ Great job! Keep clicking!'}
@@ -89,7 +218,7 @@ export default function ClickCounterApp() {
             {clickCount >= 20 && '🏆 Amazing! You\'re a clicking champion!'}
           </p>
         </div>
-      </div>
+      </Card>
     </main>
   );
 }
