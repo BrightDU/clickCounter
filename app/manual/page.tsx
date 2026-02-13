@@ -80,6 +80,12 @@ export default function ManualPage() {
             <li className="cursor-pointer hover:text-indigo-700">11. What is Next.js?</li>
             <li className="cursor-pointer hover:text-indigo-700">12. Next.js vs React</li>
             <li className="cursor-pointer hover:text-indigo-700">13. Routing in Next.js</li>
+            <li className="cursor-pointer hover:text-indigo-700">14. Firebase: Backend as a Service</li>
+            <li className="cursor-pointer hover:text-indigo-700">15. Firebase Setup & Configuration</li>
+            <li className="cursor-pointer hover:text-indigo-700">16. Firebase Authentication</li>
+            <li className="cursor-pointer hover:text-indigo-700">17. Firestore: Storing User Data</li>
+            <li className="cursor-pointer hover:text-indigo-700">18. Firestore Security Rules</li>
+            <li className="cursor-pointer hover:text-indigo-700">19. Common Firebase Errors</li>
           </ol>
         </div>
 
@@ -560,6 +566,376 @@ export default function Navigation() {
     </nav>
   );
 }`} />
+        </Section>
+
+        <Section id="firebase-intro" title="Firebase: Backend as a Service">
+          <p>
+            Firebase is a platform provided by Google that lets you build and run apps without managing a backend server. 
+            It provides authentication, real-time database, and more - all managed for you.
+          </p>
+          <div className="bg-purple-50 border-l-4 border-purple-600 p-4 my-4">
+            <strong>Simple Definition:</strong> Firebase is like having a backend developer for your app without actually hiring one. 
+            It handles user authentication, data storage, and more automatically.
+          </div>
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Key Firebase Services</h3>
+          <ul className="space-y-3 list-disc list-inside">
+            <li><strong>Authentication:</strong> Sign up, login, password management - all built-in</li>
+            <li><strong>Firestore:</strong> Cloud database to store and retrieve your data</li>
+            <li><strong>Real-time Database:</strong> Instantly syncs data across all users</li>
+            <li><strong>Cloud Storage:</strong> Store files like images and videos</li>
+            <li><strong>Hosting:</strong> Deploy your app to Firebase servers</li>
+          </ul>
+        </Section>
+
+        <Section id="firebase-setup" title="Firebase Setup & Configuration">
+          <p>
+            Before using Firebase, you need to set it up. Here's how:
+          </p>
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Step 1: Create a Firebase Project</h3>
+          <ol className="list-decimal list-inside space-y-2 mb-4">
+            <li>Go to <code className="bg-gray-200 px-2 py-1 rounded">firebase.google.com</code></li>
+            <li>Click "Get Started"</li>
+            <li>Create a new project (name it something like "my-clickcounter-app")</li>
+            <li>Complete the setup wizard</li>
+          </ol>
+
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Step 2: Get Your Firebase Config</h3>
+          <ol className="list-decimal list-inside space-y-2 mb-4">
+            <li>In Firebase Console, click the gear icon (Settings) at the top</li>
+            <li>Click "Project Settings"</li>
+            <li>Scroll down to "Your apps" section</li>
+            <li>Click the Web app icon (&lt;/&gt;)</li>
+            <li>Copy the config object - this contains your API keys</li>
+          </ol>
+
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Step 3: Install Firebase SDK</h3>
+          <CodeBlock code={`# Using npm
+npm install firebase
+
+# Using pnpm
+pnpm add firebase
+
+# Using yarn
+yarn add firebase`} />
+
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Step 4: Create Your Config File</h3>
+          <p>Create a file at <code className="bg-gray-200 px-2 py-1 rounded">lib/firebase.ts</code>:</p>
+          <CodeBlock code={`// lib/firebase.ts
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+
+// Your Firebase config (get from Firebase Console)
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID",
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Auth and Firestore
+export const auth = getAuth(app);
+export const db = getFirestore(app);`} />
+        </Section>
+
+        <Section id="firebase-auth" title="Firebase Authentication: Sign Up & Login">
+          <p>
+            Firebase handles all the complexity of user authentication for you. Here's how to implement signup and login.
+          </p>
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Creating an Auth Context</h3>
+          <p>
+            A Context lets any component access user info without prop drilling. Create <code className="bg-gray-200 px-2 py-1 rounded">lib/auth-context.tsx</code>:
+          </p>
+          <CodeBlock code={`// lib/auth-context.tsx
+'use client';
+
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  type User,
+} from 'firebase/auth';
+import { auth } from './firebase';
+
+// Create context
+const AuthContext = createContext(undefined);
+
+// Provider component
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Sign up function
+  const signup = async (email, password) => {
+    await createUserWithEmailAndPassword(auth, email, password);
+  };
+
+  // Login function
+  const login = async (email, password) => {
+    await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  // Logout function
+  const logout = async () => {
+    await signOut(auth);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, signup, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// Custom hook to use auth
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+}`} />
+
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Using Auth in Your App</h3>
+          <CodeBlock code={`// app/layout.tsx
+import { AuthProvider } from '@/lib/auth-context';
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}
+
+// app/login/page.tsx
+'use client';
+
+import { useAuth } from '@/lib/auth-context';
+import { useState } from 'react';
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const { login } = useAuth();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      await login(email, password);
+      // User is logged in!
+    } catch (error) {
+      alert('Login failed: ' + error.message);
+    }
+  };
+
+  return (
+    <form onSubmit={handleLogin}>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+      />
+      <button type="submit">Login</button>
+    </form>
+  );
+}`} />
+        </Section>
+
+        <Section id="firebase-firestore" title="Firestore: Storing User Data">
+          <p>
+            Firestore is a cloud database. You can store user data like click counts and retrieve it later.
+          </p>
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Database Structure</h3>
+          <p>
+            Firestore organizes data like folders and files. For our click counter:
+          </p>
+          <CodeBlock code={`// Firestore Collection: 'users'
+// Document ID: user.uid (unique ID from Firebase Auth)
+{
+  userId: "user123",
+  clickCount: 42,
+  email: "user@example.com",
+  lastUpdated: timestamp,
+  createdAt: timestamp
+}`} />
+
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Save Data to Firestore</h3>
+          <CodeBlock code={`// lib/firestore-utils.ts
+import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
+
+// Save or update user's click count
+export async function updateUserClickCount(user, clickCount) {
+  try {
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (userDocSnap.exists()) {
+      // Update existing document
+      await updateDoc(userDocRef, {
+        clickCount: clickCount,
+        lastUpdated: new Date(),
+      });
+    } else {
+      // Create new document
+      await setDoc(userDocRef, {
+        userId: user.uid,
+        clickCount: clickCount,
+        email: user.email,
+        createdAt: new Date(),
+        lastUpdated: new Date(),
+      });
+    }
+  } catch (error) {
+    console.error('Error saving data:', error);
+  }
+}
+
+// Get user's click count
+export async function getUserClickCount(user) {
+  try {
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (userDocSnap.exists()) {
+      return userDocSnap.data().clickCount;
+    }
+    return 0;
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    return 0;
+  }
+}`} />
+
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Use in Your Click Counter</h3>
+          <CodeBlock code={`// app/page.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/auth-context';
+import { updateUserClickCount, getUserClickCount } from '@/lib/firestore-utils';
+
+export default function ClickCounterApp() {
+  const { user } = useAuth();
+  const [clickCount, setClickCount] = useState(0);
+
+  // Load click count when user logs in
+  useEffect(() => {
+    if (user) {
+      loadClickCount();
+    }
+  }, [user]);
+
+  const loadClickCount = async () => {
+    const count = await getUserClickCount(user);
+    setClickCount(count);
+  };
+
+  const handleClick = async () => {
+    const newCount = clickCount + 1;
+    setClickCount(newCount);
+    
+    // Save to Firestore
+    await updateUserClickCount(user, newCount);
+  };
+
+  if (!user) {
+    return <div>Please log in first</div>;
+  }
+
+  return (
+    <div>
+      <p>Click Count: {clickCount}</p>
+      <button onClick={handleClick}>Click Me!</button>
+    </div>
+  );
+}`} />
+        </Section>
+
+        <Section id="firebase-firestore-rules" title="Firestore Security Rules">
+          <p>
+            Security rules protect your database. They specify who can read and write data.
+          </p>
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Set Up Rules in Firebase Console</h3>
+          <ol className="list-decimal list-inside space-y-2 mb-4">
+            <li>Go to Firebase Console</li>
+            <li>Click "Firestore Database" in the left menu</li>
+            <li>Click the "Rules" tab at the top</li>
+            <li>Replace the rules with the code below</li>
+            <li>Click "Publish"</li>
+          </ol>
+
+          <p className="mb-4">Paste these rules to allow users to only read/write their own data:</p>
+          <CodeBlock code={`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read and write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+  }
+}`} />
+
+          <div className="bg-amber-50 border-l-4 border-amber-600 p-4 my-4">
+            <strong className="text-amber-900">Important:</strong> Without these rules, anyone could read and modify other users' data!
+          </div>
+        </Section>
+
+        <Section id="firebase-common-errors" title="Common Firebase Errors & Solutions">
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Error: &quot;Firebase is not defined&quot;</h3>
+          <ul className="space-y-2 list-disc list-inside mb-4">
+            <li>Make sure you installed Firebase: <code className="bg-gray-200 px-2 py-1 rounded">npm install firebase</code></li>
+            <li>Make sure your imports are correct</li>
+          </ul>
+
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Error: &quot;Auth/User Not Found&quot;</h3>
+          <ul className="space-y-2 list-disc list-inside mb-4">
+            <li>Check that your Firebase config is correct</li>
+            <li>Check that the user created an account</li>
+            <li>Check the email and password are correct</li>
+          </ul>
+
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Error: &quot;Permission Denied&quot;</h3>
+          <ul className="space-y-2 list-disc list-inside mb-4">
+            <li>Check your Firestore Security Rules</li>
+            <li>Make sure the user is logged in (authenticated)</li>
+            <li>Make sure the user ID matches in the rules</li>
+          </ul>
+
+          <h3 className="text-lg font-semibold text-indigo-600 mt-6 mb-3">Error: &quot;Unable to read config from server&quot;</h3>
+          <ul className="space-y-2 list-disc list-inside mb-4">
+            <li>Your Firebase config has wrong values</li>
+            <li>Double-check the config from Firebase Console</li>
+            <li>Make sure you copied all values correctly</li>
+          </ul>
         </Section>
 
         {/* Summary */}
